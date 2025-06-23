@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
 import logging
+from bdb import effective
+
 logging.basicConfig(filename='log.log', format='%(asctime)s - %(levelname)s - %(message)s', level=logging.INFO)
 logger = logging.getLogger('Info')
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
@@ -39,15 +41,9 @@ def pvp(update, context):
         response = update.effective_user.name + responses['poll']
     #Does the poll provide any arguments such as league
     if len(context.args) > 0:
-        #Did the user specify a league that he wants to play in? - If so, we format it
-        if context.args[0].lower() == responses['greatleague'] or context.args[0].lower() == responses['ultraleague'] or context.args[0].lower() == responses['masterleague']:
-            response += responses['league'] + context.args[0]
-            #Did he specify more information? We just ass "Info:" infront of it and return the same query
-            if len(context.args) > 1:
-                response += responses['pollinfo'] + ' '.join(context.args[1:])
+        response += responses['pollinfo'] + ' '.join(context.args[0:])
         #Did the user provide information without specifying the league
-        else:
-            response += responses['pollinfo'] + ' '.join(context.args)
+
     #Send the poll and add the buttons to it
     bot_message = context.bot.send_message(parse_mode='Markdown', chat_id=update.message.chat_id, text=response, reply_markup=pvp_keyboard(responses))
     logger.info('PvP request by %s (MessageID: %s, ChatID: %s) with arguments %s', update._effective_user.username, bot_message.message_id, bot_message.chat_id, context.args)
@@ -76,13 +72,15 @@ def add_competitor(update, context):
         #Retrieve the user object and his name, if he has one defined
         user = update.effective_user
         name = trainernames.get_trainername(user.id)
+
         #Format the users name
         if name is not None:
             direct_message = "[" + name + "](tg://user?id=" + str(user.id) + ")"
         else:
             direct_message = '@' + user.username
-        #load the direct message to notifiy the creator
-        direct_message += jsonresponse[language]['accepted']
+        #load the direct message to notify the creator
+        direct_message += (jsonresponse[language]['accepted'] + "\n\[" + update.effective_chat.title + "]")
+
         #Try to send a private notification to the creator of the poll
         try:
             context.bot.send_message(parse_mode='Markdown', chat_id=pvprequests[update.effective_message.message_id, update.effective_chat.id]['user'], text=direct_message)
