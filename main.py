@@ -36,7 +36,7 @@ def get_dog():
     return url
 
 def get_cat():
-    contents = requests.get('http://aws.random.cat/meow').json()
+    contents = requests.get('https://api.thecatapi.com/v1/images/search').json()
     url = contents['file']
     return url
 
