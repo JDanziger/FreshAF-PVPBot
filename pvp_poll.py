@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 import logging
-from bdb import effective
 
 logging.basicConfig(filename='log.log', format='%(asctime)s - %(levelname)s - %(message)s', level=logging.INFO)
 logger = logging.getLogger('Info')
@@ -24,6 +23,8 @@ def pvp(update, context):
     #Load the language settings for this group
     language = database.get_language(update.message.chat_id)
     responses = jsonresponse[language]
+    duplicate_entry = False
+
     #Try to delete the /pvp command
     try:
         context.bot.delete_message(chat_id=update.message.chat_id,
@@ -32,24 +33,35 @@ def pvp(update, context):
     except:
         context.bot.send_message(chat_id=update.message.chat_id, text=responses['pvp_cant_delete'])
         logger.info('Cannot delete message Chat:%s MessageID:%s', update.message.chat_id, update._effective_message['message_id'])
-    #Check, if we have a name for this telegram user
-    name = trainernames.get_trainername(update.effective_user.id)
-    #Format the name properly if we have a user. Otherwise, we just take the users telegram name
-    if name is not None:
-        response = "[" + name + "](tg://user?id=" + str(update.effective_user.id) + ")" + responses['poll']
-    else:
-        response = update.effective_user.name + responses['poll']
-    #Does the poll provide any arguments such as league
-    if len(context.args) > 0:
-        response += responses['pollinfo'] + ' '.join(context.args[0:])
-        #Did the user provide information without specifying the league
 
-    #Send the poll and add the buttons to it
-    bot_message = context.bot.send_message(parse_mode='Markdown', chat_id=update.message.chat_id, text=response, reply_markup=pvp_keyboard(responses))
-    logger.info('PvP request by %s (MessageID: %s, ChatID: %s) with arguments %s', update._effective_user.username, bot_message.message_id, bot_message.chat_id, context.args)
-    #Store the message and create a list for the competitors
-    pvprequests[bot_message.message_id, bot_message.chat_id] = {'user' : update.effective_user.id, 'date' : datetime.now(), 'text' : response}
-    competitors[bot_message.message_id, bot_message.chat_id] = []
+   # Check to see if the user is creating multiple polls in same chat board
+    for val in pvprequests.keys():
+        if (update.message.chat_id in val):
+            if (update.effective_user.id == pvprequests[val]['user']):
+                duplicate_entry = True
+                break
+
+    print (duplicate_entry)
+
+    if (not duplicate_entry):
+        #Check, if we have a name for this telegram user
+        name = trainernames.get_trainername(update.effective_user.id)
+        #Format the name properly if we have a user. Otherwise, we just take the users telegram name
+        if name is not None:
+            response = "[" + name + "](tg://user?id=" + str(update.effective_user.id) + ")" + responses['poll']
+        else:
+            response = update.effective_user.name + responses['poll']
+        #Does the poll provide any arguments such as league
+        if len(context.args) > 0:
+            response += responses['pollinfo'] + ' '.join(context.args[0:])
+            #Did the user provide information without specifying the league
+
+        #Send the poll and add the buttons to it
+        bot_message = context.bot.send_message(parse_mode='Markdown', chat_id=update.message.chat_id, text=response, reply_markup=pvp_keyboard(responses))
+        logger.info('PvP request by %s (MessageID: %s, ChatID: %s) with arguments %s', update._effective_user.username, bot_message.message_id, bot_message.chat_id, context.args)
+        #Store the message and create a list for the competitors
+        pvprequests[bot_message.message_id, bot_message.chat_id] = {'user' : update.effective_user.id, 'date' : datetime.now(), 'text' : response}
+        competitors[bot_message.message_id, bot_message.chat_id] = []
 
 """
 If a user clicks on the fight button, we will either add or revoke him from the poll
@@ -114,7 +126,7 @@ def delete_poll(update, context):
     #If we don't have a request with the message id and the chat id, we just throw an error
     except:
         logger.info('No PVP-request stored by %s, %s', update.effective_user.username, update.effective_user.id)
-        logger.warn('(MessageID: %s, ChatID: %s)\nOpen requests:', update.effective_message.message_id, update.effective_chat.id)
+        logger.warning('(MessageID: %s, ChatID: %s)\nOpen requests:', update.effective_message.message_id, update.effective_chat.id)
         for pvp in pvprequests:
             logger.info(pvp)
         return
