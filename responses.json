@@ -16,6 +16,7 @@
 		"poll":" wants to fight! Are you ready to battle?",
 		"pollinfo": "\n*Info:*",
 		"accepted": " has accepted your PvP-request!",
+		"removed": " removed self from poll.",
 		"fight": "Fight",
 		"delete": "Delete",
 		"pvp_cant_delete":"Make sure that the bot has admin rights so it can delete messages",
