@@ -5,6 +5,7 @@ logging.basicConfig(filename='log.log', format='%(asctime)s - %(levelname)s - %(
 logger = logging.getLogger('Info')
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from datetime import datetime
+from datetime import timedelta
 import trainernames
 import database
 import language_support
@@ -71,26 +72,39 @@ def add_competitor(update, context):
     query = update.callback_query
     #Get the current language 
     language = database.get_language(update._effective_chat.id)
-        
+
+    # Retrieve the user object and his name, if he has one defined
+    user = update.effective_user
+    name = trainernames.get_trainername(user.id)
+
+    # Format the users name
+    if name is not None:
+        direct_message = "[" + name + "](tg://user?id=" + str(user.id) + ")"
+    else:
+        direct_message = '@' + user.username
+
     #remove user from competitor list
     if update.effective_user in competitors[query.message.message_id, update._effective_chat.id]:
         logger.info('%s revokes the PvP request from %s', update.effective_user.username, pvprequests[update.effective_message.message_id, update.effective_chat.id]['text'].split()[0])
+
+        direct_message += jsonresponse[language]['removed'] + "\n\[" + update.effective_chat.title + "]"
+        context.bot.send_message(parse_mode='Markdown',
+                                 chat_id=pvprequests[update.effective_message.message_id, update.effective_chat.id][
+                                     'user'],
+                                 text=direct_message)
         competitors[query.message.message_id, update._effective_chat.id].remove(update.effective_user)
-        
+
+
     #add user too competitor list
     else:
         logger.info('%s joins from the PvP request from %s', update.effective_user.username, pvprequests[update.effective_message.message_id, update.effective_chat.id]['text'].split()[0])
         competitors[query.message.message_id, update._effective_chat.id].append(update.effective_user)
-        #Retrieve the user object and his name, if he has one defined
-        user = update.effective_user
-        name = trainernames.get_trainername(user.id)
 
-        #Format the users name
-        if name is not None:
-            direct_message = "[" + name + "](tg://user?id=" + str(user.id) + ")"
-        else:
-            direct_message = '@' + user.username
+        """ This section below is testing to see if we can get clickback in bot group """
         #load the direct message to notify the creator
+        #group_url = "https://t.me/c/" + str(update.effective_chat.id * -1)[3:] + "/0"
+        #direct_message += (jsonresponse[language]['accepted'] + "\n\[" + update.effective_chat.title + "]" + " " + group_url)
+
         direct_message += (jsonresponse[language]['accepted'] + "\n\[" + update.effective_chat.title + "]")
 
         #Try to send a private notification to the creator of the poll
@@ -153,11 +167,6 @@ def pvp_keyboard(response):
                 [InlineKeyboardButton(response['delete'], callback_data='delete')]]
     return InlineKeyboardMarkup(keyboard)
 
-#"""
-#This looks like dead code
-#"""
-#def get_user_name(telegramid):
-#    cursor.execute("SELECT Name FROM Names WHERE TelegramID = " + str(telegramid))
 
 """
 We want to make sure, that messages will be deleted if they exist for over an hour
