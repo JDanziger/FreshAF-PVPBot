@@ -241,8 +241,8 @@ def auto_delete(context):
         if diff > 3600:
             pvprequests.pop(pvp)
             competitors.pop((pvp[0], pvp[1]))
-        try:
-            context.bot.delete_message(chat_id=pvp[1], message_id=pvp[0])
-            logger.info("Auto delete pvp request: %s", pvp)
-        except:
-            logger.info("PvP request was already deleted (by an admin?): %s", pvp)
+            try:
+                context.bot.delete_message(chat_id=pvp[1], message_id=pvp[0])
+                logger.info("Auto delete pvp request: %s", pvp)
+             except:
+             logger.info("PvP request was already deleted (by an admin?): %s", pvp)
