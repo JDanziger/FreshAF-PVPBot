@@ -244,5 +244,5 @@ def auto_delete(context):
             try:
                 context.bot.delete_message(chat_id=pvp[1], message_id=pvp[0])
                 logger.info("Auto delete pvp request: %s", pvp)
-             except:
+            except:
                 logger.info("PvP request was already deleted (by an admin?): %s", pvp)
