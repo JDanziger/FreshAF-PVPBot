@@ -165,7 +165,7 @@ def pvp_keyboard(response):
 There is also a new feature added that will delete the existing poll if 15 minutes and repost a max of 3 times
 We call this the "float" feature.
 """
-def fThsloat_poll(context):
+def float_poll(context):
 
     now = datetime.now()
     pcopy = copy.deepcopy(dict(pvprequests))
