@@ -9,6 +9,7 @@ from datetime import timedelta
 import trainernames
 import database
 import language_support
+import copy
 
 #A list of currently open pvp requests
 pvprequests = {}
@@ -42,8 +43,6 @@ def pvp(update, context):
                 duplicate_entry = True
                 break
 
-    print (duplicate_entry)
-
     if (not duplicate_entry):
         #Check, if we have a name for this telegram user
         name = trainernames.get_trainername(update.effective_user.id)
@@ -61,7 +60,7 @@ def pvp(update, context):
         bot_message = context.bot.send_message(parse_mode='Markdown', chat_id=update.message.chat_id, text=response, reply_markup=pvp_keyboard(responses))
         logger.info('PvP request by %s (MessageID: %s, ChatID: %s) with arguments %s', update._effective_user.username, bot_message.message_id, bot_message.chat_id, context.args)
         #Store the message and create a list for the competitors
-        pvprequests[bot_message.message_id, bot_message.chat_id] = {'user' : update.effective_user.id, 'date' : datetime.now(), 'text' : response}
+        pvprequests[bot_message.message_id, bot_message.chat_id] = {'user' : update.effective_user.id, 'date' : datetime.now(), 'text' : response, 'float' : 0}
         competitors[bot_message.message_id, bot_message.chat_id] = []
 
 """
@@ -99,11 +98,6 @@ def add_competitor(update, context):
     else:
         logger.info('%s joins from the PvP request from %s', update.effective_user.username, pvprequests[update.effective_message.message_id, update.effective_chat.id]['text'].split()[0])
         competitors[query.message.message_id, update._effective_chat.id].append(update.effective_user)
-
-        """ This section below is testing to see if we can get clickback in bot group """
-        #load the direct message to notify the creator
-        #group_url = "https://t.me/c/" + str(update.effective_chat.id * -1)[3:] + "/0"
-        #direct_message += (jsonresponse[language]['accepted'] + "\n\[" + update.effective_chat.title + "]" + " " + group_url)
 
         direct_message += (jsonresponse[language]['accepted'] + "\n\[" + update.effective_chat.title + "]")
 
@@ -167,6 +161,68 @@ def pvp_keyboard(response):
                 [InlineKeyboardButton(response['delete'], callback_data='delete')]]
     return InlineKeyboardMarkup(keyboard)
 
+"""
+There is also a new feature added that will delete the existing poll if 15 minutes and repost a max of 3 times
+We call this the "float" feature.
+"""
+def float_poll(context):
+
+    now = datetime.now()
+    pcopy = copy.deepcopy(dict(pvprequests))
+
+    # Iterate over each open request and see how old it is
+    for pvpitem in pcopy:
+        language = database.get_language(pvpitem[1])
+        responses = jsonresponse[language]
+
+        diff = (now - pvprequests[pvpitem]['date']).seconds
+
+        # if the message was posted more than 15 minutes since last post or float, re-float it, max 3x
+        if diff >= 900 + (900 * pvprequests[pvpitem]['float'] ):
+            count = 0
+            if pvprequests[pvpitem]['float'] < 3:
+                pvprequests[pvpitem]['float'] += 1
+                try:
+                    context.bot.delete_message(chat_id=pvpitem[1], message_id=pvpitem[0])
+                    logger.info("Deletion to enable message float %s", pvpitem)
+                except:
+                    logger.info("PvP request was already deleted (by an admin?): %s", pvpitem)
+
+                 # Re-Send the poll and add the buttons to it
+                response = pvprequests[pvpitem]['text']
+
+                # Send out the new poll
+                try:
+                    bot_message = context.bot.send_message(parse_mode='Markdown', chat_id=pvpitem[1],
+                                                           text=response, disable_notification=True,
+                                                           reply_markup=pvp_keyboard(responses))
+
+                    #Update the new message key in the requests and delete the old key
+                    pvprequests[bot_message.message_id, bot_message.chat_id] = pvprequests.pop(pvpitem)
+                except:
+                    bot_message = None
+                    logger.info("Could not send poll: %s", pvpitem)
+
+                for fighter in competitors[pvpitem]:
+                    name = fighter['username']
+                    userid = fighter['id']
+
+                    if name is not None:
+                        response += "\n- [" + name + "](tg://user?id=" + str(userid) + ")"
+                    else:
+                        response = + '\n- ' + name
+                    count += 1
+
+                if bot_message is not None:
+                    #Update the new competitors key in the requests and delete the old key
+                    competitors[bot_message.message_id, bot_message.chat_id] = competitors.pop(pvpitem)
+                else:
+                    logger.info("Could not update competitors key list: Issue with bot_message: %s", bot_message)
+
+                context.bot.edit_message_text(parse_mode='Markdown', chat_id=bot_message.chat_id,
+                                              message_id=bot_message.message_id,
+                                              text=response,
+                                              reply_markup=pvp_keyboard(jsonresponse[language]))
 
 """
 We want to make sure, that messages will be deleted if they exist for over an hour
@@ -174,16 +230,19 @@ This is executed every ~15 minutes
 """    
 def auto_delete(context):
     now = datetime.now()
-    copy = dict(pvprequests)
+    pcopy = dict(pvprequests)
     #Iterate over each open request and see how old it is
-    for pvp in copy:
+    for pvp in pcopy:
+        language = database.get_language(pvp[1])
+        responses = jsonresponse[language]
+
         diff = (now - pvprequests[pvp]['date']).seconds
-        #If the message was posted more than an hour ago, we want to delete it
+
         if diff > 3600:
             pvprequests.pop(pvp)
             competitors.pop((pvp[0], pvp[1]))
-            try:
-                context.bot.delete_message(chat_id=pvp[1], message_id=pvp[0])
-                logger.info("Auto delete pvp request: %s", pvp)
-            except:
-                logger.info("PvP request was already deleted (by an admin?): %s", pvp)
+        try:
+            context.bot.delete_message(chat_id=pvp[1], message_id=pvp[0])
+            logger.info("Auto delete pvp request: %s", pvp)
+        except:
+            logger.info("PvP request was already deleted (by an admin?): %s", pvp)
