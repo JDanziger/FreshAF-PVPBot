@@ -136,8 +136,8 @@ def main():
     #Deletes a pvp request - TODO: Admins should be able to delete requests
     updater.dispatcher.add_handler(CallbackQueryHandler(pvp_poll.delete_poll, pattern='delete'))
     #Check if there are any outdated pvp requests which we want to delete
-    auto_del = job.run_repeating(pvp_poll.auto_delete, interval=900, first=0)
-    float_poll = job.run_repeating(pvp_poll.float_poll, interval=300, first=0)
+    auto_del = job.run_repeating(pvp_poll.auto_delete, interval=300, first=0)
+    float_poll = job.run_repeating(pvp_poll.float_poll, interval=120, first=0)
 
     #Confirm config request
     updater.dispatcher.add_handler(CallbackQueryHandler(response_menu.confirm_config, pattern='Confirm'))

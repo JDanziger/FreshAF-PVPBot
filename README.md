@@ -1,3 +1,4 @@
+![Image alt](https://github.com/JDanziger/FreshAF-PVPBot/blob/main/FreshAF-Repository.jpg?raw=true)
 # Pokémon Go PvP Bot
 Hey there! This is a Telegram bot for Pokemon Go PvP groups. Feel free to clone the repository and host your own version of the bot! If you want to test it first you can find a running version on Telegram @PoGoPvP_bot
 
