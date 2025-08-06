@@ -41,6 +41,10 @@ def pvp(update, context):
         if (update.message.chat_id in val):
             if (update.effective_user.id == pvprequests[val]['user']):
                 duplicate_entry = True
+                direct_message = jsonresponse[language]['dup_poll'] + "\n\[" + update.effective_chat.title + "]"
+                context.bot.send_message(parse_mode='Markdown',
+                                chat_id=pvprequests[val]['user'],
+                                text=direct_message)
                 break
 
     if (not duplicate_entry):
@@ -169,27 +173,36 @@ def float_poll(context):
 
     now = datetime.now()
     pcopy = copy.deepcopy(dict(pvprequests))
+    balloons =  ""
 
     # Iterate over each open request and see how old it is
     for pvpitem in pcopy:
         language = database.get_language(pvpitem[1])
         responses = jsonresponse[language]
+        fighter_count = 0
 
         diff = (now - pvprequests[pvpitem]['date']).seconds
 
         # if the message was posted more than 15 minutes since last post or float, re-float it, max 3x
-        if diff >= 900 + (900 * pvprequests[pvpitem]['float'] ):
-            count = 0
+        if diff >= 600 + (600 * pvprequests[pvpitem]['float'] ):
             if pvprequests[pvpitem]['float'] < 3:
                 pvprequests[pvpitem]['float'] += 1
                 try:
                     context.bot.delete_message(chat_id=pvpitem[1], message_id=pvpitem[0])
                     logger.info("Deletion to enable message float %s", pvpitem)
                 except:
+                    # if the delete message failed - the poll is most likely gone
+                    # in which case, we dont want to float again.  So pop the queues and go to next request
                     logger.info("PvP request was already deleted (by an admin?): %s", pvpitem)
+                    pvprequests.pop(pvpitem)
+                    competitors.pop(pvpitem)
+                    continue
+
+                for i in range(pvprequests[pvpitem]['float'], 4):
+                    balloons += "\U0001F388"
 
                  # Re-Send the poll and add the buttons to it
-                response = pvprequests[pvpitem]['text']
+                response = pvprequests[pvpitem]['text'] + " " + balloons
 
                 # Send out the new poll
                 try:
@@ -204,6 +217,7 @@ def float_poll(context):
                     logger.info("Could not send poll: %s", pvpitem)
 
                 for fighter in competitors[pvpitem]:
+                    fighter_count += 1
                     name = fighter['username']
                     userid = fighter['id']
 
@@ -211,7 +225,6 @@ def float_poll(context):
                         response += "\n- [" + name + "](tg://user?id=" + str(userid) + ")"
                     else:
                         response = + '\n- ' + name
-                    count += 1
 
                 if bot_message is not None:
                     #Update the new competitors key in the requests and delete the old key
@@ -219,10 +232,11 @@ def float_poll(context):
                 else:
                     logger.info("Could not update competitors key list: Issue with bot_message: %s", bot_message)
 
-                context.bot.edit_message_text(parse_mode='Markdown', chat_id=bot_message.chat_id,
-                                              message_id=bot_message.message_id,
-                                              text=response,
-                                              reply_markup=pvp_keyboard(jsonresponse[language]))
+                if fighter_count > 0:
+                    context.bot.edit_message_text(parse_mode='Markdown', chat_id=bot_message.chat_id,
+                                                message_id=bot_message.message_id,
+                                                text=response,
+                                                reply_markup=pvp_keyboard(jsonresponse[language]))
 
 """
 We want to make sure, that messages will be deleted if they exist for over an hour
@@ -231,18 +245,18 @@ This is executed every ~15 minutes
 def auto_delete(context):
     now = datetime.now()
     pcopy = dict(pvprequests)
+
     #Iterate over each open request and see how old it is
-    for pvp in pcopy:
-        language = database.get_language(pvp[1])
-        responses = jsonresponse[language]
+    for pvp_req in pcopy:
+        diff = (now - pvprequests[pvp_req]['date']).seconds
 
-        diff = (now - pvprequests[pvp]['date']).seconds
+        if diff > 2400:
+            pvprequests.pop(pvp_req)
+            competitors.pop((pvp_req[0], pvp_req[1]))
 
-        if diff > 3600:
-            pvprequests.pop(pvp)
-            competitors.pop((pvp[0], pvp[1]))
             try:
-                context.bot.delete_message(chat_id=pvp[1], message_id=pvp[0])
-                logger.info("Auto delete pvp request: %s", pvp)
-            except:
-                logger.info("PvP request was already deleted (by an admin?): %s", pvp)
+                context.bot.delete_message(chat_id=pvp_req[1], message_id=pvp_req[0])
+                logger.info("Auto delete pvp request: %s", pvp_req)
+            except Exception as e:
+                print("Exception Message: ", e.message)
+                logger.info("PvP request was already deleted (by an admin?): %s", pvp_req)
