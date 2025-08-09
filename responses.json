@@ -17,6 +17,7 @@
 		"accepted": " has accepted your PvP-request!",
 		"removed": " removed self from poll.",
 		"dup_poll": " A duplicate poll in this chat already exists.",
+		"deleted_poll": "Your poll has expired in: ",
 		"fight": "Fight",
 		"delete": "Delete",
 		"pvp_cant_delete":"Make sure that the bot has admin rights so it can delete messages",
@@ -28,8 +29,9 @@
 		"trainercode_length":"Your trainercode must be 12 characters long!",
 		"trainercode_success":"Trainercode set successfully",
 		"trainercode_fail":"Trainercode could not be set",
-		"language_not_supported":"I am afraid don't support that language yet! \nThe current supported languages are: *{}* \nSet the language with \"/language es\"\nIf your language is not supported, you can join this [Telegram Group](https://t.me/joinchat/ET9xmhO2jGHqZ1adIeeFRQ) and help adding it!",
+		"language_not_supported":"I am afraid don't support that language yet! \nThe current supported languages are: *{}* \nSet the language with \"/language es\"\nIf your language is not supported, talk to admins.",
 		"language_hint":"I have noticed that you speak a different language. You can set your bot to your language using the /language command",
-		"only_for_admins":"Only admins can change this setting"
+		"only_for_admins":"Only admins can change this setting",
+		"version": "The current software version is: "
 	}
 }

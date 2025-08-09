@@ -129,6 +129,8 @@ def main():
     dispatcher.add_handler(CommandHandler("start", start))
     dispatcher.add_handler(CommandHandler("help", start))
 
+    #Show Version
+    updater.dispatcher.add_handler(CommandHandler('version', pvp_poll.version))
     #Create a pvp request
     updater.dispatcher.add_handler(CommandHandler('pvp', pvp_poll.pvp))
     #Add/removes a competitor if he clicks on fight
