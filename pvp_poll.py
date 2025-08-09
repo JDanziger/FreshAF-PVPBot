@@ -17,6 +17,20 @@ pvprequests = {}
 competitors = {}
 #The language strings
 jsonresponse = language_support.responses
+#The current version of software
+ver ="1.0"
+
+"""
+This method will show the current version of Software
+"""
+
+def version(update, context):
+    # Load the language settings for this group
+    language = database.get_language(update.message.chat_id)
+    responses = jsonresponse[language]
+
+    response = responses['version'] + ver
+    context.bot.send_message(chat_id=update.message.chat_id, text=response)
 
 """
 This method transforms /pvp into a request with clickable buttons
@@ -64,7 +78,7 @@ def pvp(update, context):
         bot_message = context.bot.send_message(parse_mode='Markdown', chat_id=update.message.chat_id, text=response, reply_markup=pvp_keyboard(responses))
         logger.info('PvP request by %s (MessageID: %s, ChatID: %s) with arguments %s', update._effective_user.username, bot_message.message_id, bot_message.chat_id, context.args)
         #Store the message and create a list for the competitors
-        pvprequests[bot_message.message_id, bot_message.chat_id] = {'user' : update.effective_user.id, 'date' : datetime.now(), 'text' : response, 'float' : 0}
+        pvprequests[bot_message.message_id, bot_message.chat_id] = {'user' : update.effective_user.id, 'date' : datetime.now(), 'text' : response, 'float' : 0, 'title' : update.effective_chat.title}
         competitors[bot_message.message_id, bot_message.chat_id] = []
 
 """
@@ -79,6 +93,7 @@ def add_competitor(update, context):
     # Retrieve the user object and his name, if he has one defined
     user = update.effective_user
     name = trainernames.get_trainername(user.id)
+    balloons = ""
 
     # Format the users name
     if name is not None:
@@ -115,8 +130,13 @@ def add_competitor(update, context):
     
     """ Edit the pvp request and add the competitor"""
     #Get the initial request
-    response = pvprequests[update.effective_message.message_id, update.effective_chat.id]['text']
-    #Add the name of each user to the request
+    if pvprequests[update.effective_message.message_id, update.effective_chat.id]['float'] != 0:
+        for i in range(pvprequests[update.effective_message.message_id, update.effective_chat.id]['float'], 4):
+            balloons += "\U0001F388"
+
+    response = pvprequests[update.effective_message.message_id, update.effective_chat.id]['text'] + balloons
+
+    #Add the name of each diruser to the request
     for user in competitors[query.message.message_id, update._effective_chat.id]:
         name = trainernames.get_trainername(user.id)
         if name is not None:
@@ -173,13 +193,13 @@ def float_poll(context):
 
     now = datetime.now()
     pcopy = copy.deepcopy(dict(pvprequests))
-    balloons =  ""
 
     # Iterate over each open request and see how old it is
     for pvpitem in pcopy:
         language = database.get_language(pvpitem[1])
         responses = jsonresponse[language]
         fighter_count = 0
+        balloons = ""
 
         diff = (now - pvprequests[pvpitem]['date']).seconds
 
@@ -218,13 +238,14 @@ def float_poll(context):
 
                 for fighter in competitors[pvpitem]:
                     fighter_count += 1
-                    name = fighter['username']
                     userid = fighter['id']
+                    name = trainernames.get_trainername(userid)
 
+                    # Format the users name
                     if name is not None:
                         response += "\n- [" + name + "](tg://user?id=" + str(userid) + ")"
                     else:
-                        response = + '\n- ' + name
+                        response += '\n-' + fighter['username']
 
                 if bot_message is not None:
                     #Update the new competitors key in the requests and delete the old key
@@ -240,7 +261,7 @@ def float_poll(context):
 
 """
 We want to make sure, that messages will be deleted if they exist for over an hour
-This is executed every ~15 minutes
+This is executed every ~5 minutes
 """    
 def auto_delete(context):
     now = datetime.now()
@@ -248,14 +269,19 @@ def auto_delete(context):
 
     #Iterate over each open request and see how old it is
     for pvp_req in pcopy:
+        language = database.get_language(pvp_req[1])
+        responses = jsonresponse[language]
+
         diff = (now - pvprequests[pvp_req]['date']).seconds
 
         if diff > 2400:
-            pvprequests.pop(pvp_req)
-            competitors.pop((pvp_req[0], pvp_req[1]))
-
             try:
                 context.bot.delete_message(chat_id=pvp_req[1], message_id=pvp_req[0])
+
+                direct_message = responses['deleted_poll'] + "[" +  pvprequests[pvp_req]['title'] +"]"
+                context.bot.send_message(chat_id=pvprequests[pvp_req]['user'], text=direct_message)
+                pvprequests.pop(pvp_req)
+                competitors.pop((pvp_req[0], pvp_req[1]))
                 logger.info("Auto delete pvp request: %s", pvp_req)
             except Exception as e:
                 print("Exception Message: ", e.message)
