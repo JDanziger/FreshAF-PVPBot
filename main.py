@@ -135,6 +135,8 @@ def main():
     updater.dispatcher.add_handler(CommandHandler('pvp', pvp_poll.pvp))
     #Add/removes a competitor if he clicks on fight
     updater.dispatcher.add_handler(CallbackQueryHandler(pvp_poll.add_competitor, pattern='fight'))
+    #Remove player from poll (Leave Option)
+    updater.dispatcher.add_handler(CallbackQueryHandler(pvp_poll.remove_competitor, pattern='leave'))
     #Deletes a pvp request - TODO: Admins should be able to delete requests
     updater.dispatcher.add_handler(CallbackQueryHandler(pvp_poll.delete_poll, pattern='delete'))
     #Check if there are any outdated pvp requests which we want to delete

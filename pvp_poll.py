@@ -18,12 +18,11 @@ competitors = {}
 #The language strings
 jsonresponse = language_support.responses
 #The current version of software
-ver ="1.0"
+ver ="1.3"
 
 """
 This method will show the current version of Software
 """
-
 def version(update, context):
     # Load the language settings for this group
     language = database.get_language(update.message.chat_id)
@@ -55,10 +54,14 @@ def pvp(update, context):
         if (update.message.chat_id in val):
             if (update.effective_user.id == pvprequests[val]['user']):
                 duplicate_entry = True
-                direct_message = jsonresponse[language]['dup_poll'] + "\n\[" + update.effective_chat.title + "]"
-                context.bot.send_message(parse_mode='Markdown',
-                                chat_id=pvprequests[val]['user'],
-                                text=direct_message)
+                try:
+                    direct_message = jsonresponse[language]['dup_poll'] + "\n\[" + update.effective_chat.title + "]"
+                    context.bot.send_message(parse_mode='Markdown',
+                                    chat_id=pvprequests[val]['user'],
+                                    text=direct_message)
+                except:
+                    logger.info("Cannot initiate private conversation with %s",
+                                pvprequests[update.effective_message.message_id, update.effective_chat.id]['text'].split()[0])
                 break
 
     if (not duplicate_entry):
@@ -103,15 +106,8 @@ def add_competitor(update, context):
 
     #remove user from competitor list
     if update.effective_user in competitors[query.message.message_id, update._effective_chat.id]:
-        logger.info('%s revokes the PvP request from %s', update.effective_user.username, pvprequests[update.effective_message.message_id, update.effective_chat.id]['text'].split()[0])
-
-        direct_message += jsonresponse[language]['removed'] + "\n\[" + update.effective_chat.title + "]"
-        context.bot.send_message(parse_mode='Markdown',
-                                 chat_id=pvprequests[update.effective_message.message_id, update.effective_chat.id][
-                                     'user'],
-                                 text=direct_message)
-        competitors[query.message.message_id, update._effective_chat.id].remove(update.effective_user)
-
+        logger.info('%s user already in list %s', update.effective_user.username, pvprequests[update.effective_message.message_id, update.effective_chat.id]['text'].split()[0])
+        return
 
     #add user too competitor list
     else:
@@ -149,6 +145,63 @@ def add_competitor(update, context):
                           text=response,
                           reply_markup=pvp_keyboard(jsonresponse[language]))
 
+
+""" If a user clicks on leave, we want to delete them from the current poll they signed up for"""
+def remove_competitor(update, context):
+    query = update.callback_query
+    #Get the current language
+    language = database.get_language(update._effective_chat.id)
+
+    # Retrieve the user object and his name, if he has one defined
+    user = update.effective_user
+    name = trainernames.get_trainername(user.id)
+    balloons = ""
+
+    # Format the users name
+    if name is not None:
+        direct_message = "[" + name + "](tg://user?id=" + str(user.id) + ")"
+    else:
+        direct_message = '@' + user.username
+
+    # remove user from competitor list
+    if update.effective_user in competitors[query.message.message_id, update._effective_chat.id]:
+        logger.info('%s revokes the PvP request from %s', update.effective_user.username,
+                    pvprequests[update.effective_message.message_id, update.effective_chat.id]['text'].split()[0])
+
+        direct_message += jsonresponse[language]['removed'] + "\n\[" + update.effective_chat.title + "]"
+        competitors[query.message.message_id, update._effective_chat.id].remove(update.effective_user)
+
+        try:
+            context.bot.send_message(parse_mode='Markdown',
+                                    chat_id=pvprequests[update.effective_message.message_id, update.effective_chat.id][
+                                      'user'],
+                                     text=direct_message)
+        except:
+            logger.info("Cannot initiate private conversation with %s", pvprequests[update.effective_message.message_id, update.effective_chat.id]['text'].split()[0])
+    else:
+        return
+
+    """ Edit the pvp request and update the competitors"""
+    #Get the initial request
+    if pvprequests[update.effective_message.message_id, update.effective_chat.id]['float'] != 0:
+        for i in range(pvprequests[update.effective_message.message_id, update.effective_chat.id]['float'], 4):
+            balloons += "\U0001F388"
+
+    response = pvprequests[update.effective_message.message_id, update.effective_chat.id]['text'] + balloons
+
+    #Add the name of each diruser to the request
+    for user in competitors[query.message.message_id, update._effective_chat.id]:
+        name = trainernames.get_trainername(user.id)
+        if name is not None:
+            response += "\n- [" + name + "](tg://user?id=" + str(update.effective_user.id) + ")"
+        else:
+            response += '\n- ' + user.name
+    #Update the message
+    context.bot.edit_message_text(parse_mode='Markdown', chat_id=query.message.chat_id,
+                          message_id=query.message.message_id,
+                          text=response,
+                          reply_markup=pvp_keyboard(jsonresponse[language]))
+
 """ If a user clicks on delete, we want to delete this poll and all the information that we held with it"""
 def delete_poll(update, context):
     #Try to remove the request
@@ -178,10 +231,11 @@ def delete_poll(update, context):
         logger.info('Cannot delete message Chat:%s MessageID:%s', update.message.chat_id, update._effective_message['message_id'])
 
 """
-Just the button markup for fight and delete
+Just the button markup for fight, leave and delete
 """
 def pvp_keyboard(response):
-    keyboard = [[InlineKeyboardButton(response['fight'], callback_data='fight')],
+    keyboard = [[InlineKeyboardButton(response['fight'], callback_data='fight'),
+                InlineKeyboardButton(response['leave'], callback_data='leave')],
                 [InlineKeyboardButton(response['delete'], callback_data='delete')]]
     return InlineKeyboardMarkup(keyboard)
 
@@ -245,7 +299,7 @@ def float_poll(context):
                     if name is not None:
                         response += "\n- [" + name + "](tg://user?id=" + str(userid) + ")"
                     else:
-                        response += '\n-' + fighter['username']
+                        response += '\n- ' + fighter['name']
 
                 if bot_message is not None:
                     #Update the new competitors key in the requests and delete the old key
@@ -275,14 +329,17 @@ def auto_delete(context):
         diff = (now - pvprequests[pvp_req]['date']).seconds
 
         if diff > 2400:
-            try:
-                context.bot.delete_message(chat_id=pvp_req[1], message_id=pvp_req[0])
+            pvprequests.pop(pvp_req)
+            competitors.pop((pvp_req[0], pvp_req[1]))
 
-                direct_message = responses['deleted_poll'] + "[" +  pvprequests[pvp_req]['title'] +"]"
-                context.bot.send_message(chat_id=pvprequests[pvp_req]['user'], text=direct_message)
-                pvprequests.pop(pvp_req)
-                competitors.pop((pvp_req[0], pvp_req[1]))
+            try:
                 logger.info("Auto delete pvp request: %s", pvp_req)
-            except Exception as e:
-                print("Exception Message: ", e.message)
+                context.bot.delete_message(chat_id=pvp_req[1], message_id=pvp_req[0])
+            except:
                 logger.info("PvP request was already deleted (by an admin?): %s", pvp_req)
+
+            direct_message = responses['deleted_poll'] + "[" +  pvprequests[pvp_req]['title'] +"]"
+            try:
+                context.bot.send_message(chat_id=pvprequests[pvp_req]['user'], text=direct_message)
+            except:
+                logger.info("Cannot initiate private conversation with %s", pvprequests[update.effective_message.message_id, update.effective_chat.id]['text'].split()[0])
