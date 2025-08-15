@@ -22,6 +22,7 @@
 		"fight": "Fight",
 		"leave": "Leave",
 		"delete": "Delete",
+		"maint": "Attention Bot undergoing an upgrade. All active polls are being removed. Please wait ~5 minutes and create a new poll to continue. Sorry for the inconvenience.\n",
 		"pvp_cant_delete":"Make sure that the bot has admin rights so it can delete messages",
 		"group_notice":"This can only be done in groups!",
 		"settings_updated":"Settings updated",

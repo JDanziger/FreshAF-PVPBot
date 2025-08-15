@@ -131,6 +131,8 @@ def main():
 
     #Show Version
     updater.dispatcher.add_handler(CommandHandler('version', pvp_poll.version))
+    #Create a maintenance request
+    updater.dispatcher.add_handler(CommandHandler('maint', pvp_poll.maintenance))
     #Create a pvp request
     updater.dispatcher.add_handler(CommandHandler('pvp', pvp_poll.pvp))
     #Add/removes a competitor if he clicks on fight

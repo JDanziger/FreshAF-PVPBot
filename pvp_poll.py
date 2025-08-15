@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import logging
+from zipapp import MAIN_TEMPLATE
 
 logging.basicConfig(filename='log.log', format='%(asctime)s - %(levelname)s - %(message)s', level=logging.INFO)
 logger = logging.getLogger('Info')
@@ -18,12 +19,37 @@ competitors = {}
 #The language strings
 jsonresponse = language_support.responses
 #The current version of software
-ver ="1.4.1"
+ver ="1.5"
+#Maintenance Mode
+maintMode = False
+
+"""
+This method will show the current version of Software
+"""
+def is_admin(the_user, userlist):
+    if the_user in (admin.user for admin in userlist):
+        return True
+    else:
+        return False
 
 """
 This method will show the current version of Software
 """
 def version(update, context):
+    #Load the language settings for this group
+    language = database.get_language(update.message.chat_id)
+    responses = jsonresponse[language]
+
+    # Try to delete the /pvp command
+    try:
+        context.bot.delete_message(chat_id=update.message.chat_id,
+                                   message_id=update._effective_message['message_id'])
+    # If we cannot delete the command, the bot probably doesn't have admin rights
+    except:
+        context.bot.send_message(chat_id=update.message.chat_id, text=responses['pvp_cant_delete'])
+        logger.info('Cannot delete message Chat:%s MessageID:%s', update.message.chat_id,
+                    update._effective_message['message_id'])
+
     # Load the language settings for this group
     language = database.get_language(update.message.chat_id)
     responses = jsonresponse[language]
@@ -49,10 +75,21 @@ def pvp(update, context):
         context.bot.send_message(chat_id=update.message.chat_id, text=responses['pvp_cant_delete'])
         logger.info('Cannot delete message Chat:%s MessageID:%s', update.message.chat_id, update._effective_message['message_id'])
 
+    if maintMode:
+        try:
+            direct_message = jsonresponse[language]['maint'] + "\n\[" + update.effective_chat.title + "]"
+            context.bot.send_message(parse_mode='Markdown',
+                                     chat_id=update.effective_user['id'],
+                                     text=direct_message)
+        except:
+            logger.info("Cannot initiate private conversation with %s",
+                        pvprequests[update.effective_message.message_id, update.effective_chat.id]['text'].split()[0])
+        return
+
    # Check to see if the user is creating multiple polls in same chat board
     for val in pvprequests.keys():
-        if (update.message.chat_id in val):
-            if (update.effective_user.id == pvprequests[val]['user']):
+        if update.message.chat_id in val:
+            if update.effective_user.id == pvprequests[val]['user']:
                 duplicate_entry = True
                 try:
                     direct_message = jsonresponse[language]['dup_poll'] + "\n\[" + update.effective_chat.title + "]"
@@ -64,7 +101,7 @@ def pvp(update, context):
                                 pvprequests[update.effective_message.message_id, update.effective_chat.id]['text'].split()[0])
                 break
 
-    if (not duplicate_entry):
+    if not duplicate_entry:
         #Check, if we have a name for this telegram user
         name = trainernames.get_trainername(update.effective_user.id)
         #Format the name properly if we have a user. Otherwise, we just take the users telegram name
@@ -346,3 +383,51 @@ def auto_delete(context):
                 context.bot.send_message(chat_id=userid, text=direct_message)
             except:
                 logger.info("Cannot initiate private conversation with %s", arguments)
+
+"""
+This function is created to allow the maintenance of the bot.  It will halt new requests
+and also delete all active polls
+"""
+def maintenance(update, context):
+    global maintMode
+    active_chats = []
+    active_polls = []
+
+    # Load the language settings for this group
+    language = database.get_language(update.message.chat_id)
+    responses = jsonresponse[language]
+
+    # Try to delete the /pvp command
+    try:
+        context.bot.delete_message(chat_id=update.message.chat_id,
+                                   message_id=update._effective_message['message_id'])
+    # If we cannot delete the command, the bot probably doesn't have admin rights
+    except:
+        context.bot.send_message(chat_id=update.message.chat_id, text=responses['pvp_cant_delete'])
+        logger.info('Cannot delete message Chat:%s MessageID:%s', update.message.chat_id,
+                    update._effective_message['message_id'])
+
+    if is_admin(update.effective_user, update.effective_chat.get_administrators()):
+        maintMode = True
+    else:
+        return
+
+    # Gather all the chat groups with active polls
+    for polls in pvprequests:
+        if polls[1] not in active_chats:
+            active_chats.append(polls[1])
+
+        active_polls.append(polls)
+
+    for item in active_chats:
+        context.bot.send_message(chat_id=item, text=responses['maint'])
+
+    for polls in active_polls:
+        try:
+            context.bot.delete_message(chat_id=polls[1], message_id=polls[0])
+        except:
+            logger.info('Cannot delete message Chat:%s MessageID:%s', polls[1], polls[0])
+
+    pvprequests.clear()
+    competitors.clear()
+
