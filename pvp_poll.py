@@ -18,7 +18,7 @@ competitors = {}
 #The language strings
 jsonresponse = language_support.responses
 #The current version of software
-ver ="1.3"
+ver ="1.4.1"
 
 """
 This method will show the current version of Software
@@ -329,6 +329,9 @@ def auto_delete(context):
         diff = (now - pvprequests[pvp_req]['date']).seconds
 
         if diff > 2400:
+            userid = pvprequests[pvp_req]['user']
+            title = pvprequests[pvp_req]['title']
+            arguments = pvprequests[pvp_req]['text'].split()[0]
             pvprequests.pop(pvp_req)
             competitors.pop((pvp_req[0], pvp_req[1]))
 
@@ -338,8 +341,8 @@ def auto_delete(context):
             except:
                 logger.info("PvP request was already deleted (by an admin?): %s", pvp_req)
 
-            direct_message = responses['deleted_poll'] + "[" +  pvprequests[pvp_req]['title'] +"]"
+            direct_message = responses['deleted_poll'] + "[" +  title +"]"
             try:
-                context.bot.send_message(chat_id=pvprequests[pvp_req]['user'], text=direct_message)
+                context.bot.send_message(chat_id=userid, text=direct_message)
             except:
-                logger.info("Cannot initiate private conversation with %s", pvprequests[update.effective_message.message_id, update.effective_chat.id]['text'].split()[0])
+                logger.info("Cannot initiate private conversation with %s", arguments)
