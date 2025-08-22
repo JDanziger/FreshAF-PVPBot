@@ -9,6 +9,7 @@ from datetime import datetime
 from datetime import timedelta
 import trainernames
 import database
+import admin_only
 import language_support
 import copy
 
@@ -18,44 +19,6 @@ pvprequests = {}
 competitors = {}
 #The language strings
 jsonresponse = language_support.responses
-#The current version of software
-ver ="1.5"
-#Maintenance Mode
-maintMode = False
-
-"""
-This method will show the current version of Software
-"""
-def is_admin(the_user, userlist):
-    if the_user in (admin.user for admin in userlist):
-        return True
-    else:
-        return False
-
-"""
-This method will show the current version of Software
-"""
-def version(update, context):
-    #Load the language settings for this group
-    language = database.get_language(update.message.chat_id)
-    responses = jsonresponse[language]
-
-    # Try to delete the /pvp command
-    try:
-        context.bot.delete_message(chat_id=update.message.chat_id,
-                                   message_id=update._effective_message['message_id'])
-    # If we cannot delete the command, the bot probably doesn't have admin rights
-    except:
-        context.bot.send_message(chat_id=update.message.chat_id, text=responses['pvp_cant_delete'])
-        logger.info('Cannot delete message Chat:%s MessageID:%s', update.message.chat_id,
-                    update._effective_message['message_id'])
-
-    # Load the language settings for this group
-    language = database.get_language(update.message.chat_id)
-    responses = jsonresponse[language]
-
-    response = responses['version'] + ver
-    context.bot.send_message(chat_id=update.message.chat_id, text=response)
 
 """
 This method transforms /pvp into a request with clickable buttons
@@ -75,7 +38,7 @@ def pvp(update, context):
         context.bot.send_message(chat_id=update.message.chat_id, text=responses['pvp_cant_delete'])
         logger.info('Cannot delete message Chat:%s MessageID:%s', update.message.chat_id, update._effective_message['message_id'])
 
-    if maintMode:
+    if admin_only.maintMode:
         try:
             direct_message = jsonresponse[language]['maint'] + "\n\[" + update.effective_chat.title + "]"
             context.bot.send_message(parse_mode='Markdown',
@@ -122,7 +85,7 @@ def pvp(update, context):
         competitors[bot_message.message_id, bot_message.chat_id] = []
 
 """
-If a user clicks on the fight button, we will either add or revoke him from the poll
+If a user clicks on the fight button, he/she will be entered into the poll
 """
 def add_competitor(update, context):
     #Get the info about the message that was clicked
@@ -151,7 +114,8 @@ def add_competitor(update, context):
         logger.info('%s joins from the PvP request from %s', update.effective_user.username, pvprequests[update.effective_message.message_id, update.effective_chat.id]['text'].split()[0])
         competitors[query.message.message_id, update._effective_chat.id].append(update.effective_user)
 
-        direct_message += (jsonresponse[language]['accepted'] + "\n\[" + update.effective_chat.title + "]")
+        link = "[" + update.effective_chat.title + "](https://t.me/c/" + str(update.effective_chat.id)[2:] + "/" + ")"
+        direct_message += (jsonresponse[language]['accepted'] + "\n" + link)
 
         #Try to send a private notification to the creator of the poll
         try:
@@ -183,7 +147,7 @@ def add_competitor(update, context):
                           reply_markup=pvp_keyboard(jsonresponse[language]))
 
 
-""" If a user clicks on leave, we want to delete them from the current poll they signed up for"""
+""" If a user clicks on leave, we want to delete them from the current poll they signed up for """
 def remove_competitor(update, context):
     query = update.callback_query
     #Get the current language
@@ -205,7 +169,9 @@ def remove_competitor(update, context):
         logger.info('%s revokes the PvP request from %s', update.effective_user.username,
                     pvprequests[update.effective_message.message_id, update.effective_chat.id]['text'].split()[0])
 
-        direct_message += jsonresponse[language]['removed'] + "\n\[" + update.effective_chat.title + "]"
+        link = "[" + update.effective_chat.title + "](https://t.me/c/" + str(update.effective_chat.id)[2:] + "/" + ")"
+        direct_message += (jsonresponse[language]['removed'] + "\n" + link)
+
         competitors[query.message.message_id, update._effective_chat.id].remove(update.effective_user)
 
         try:
@@ -378,56 +344,11 @@ def auto_delete(context):
             except:
                 logger.info("PvP request was already deleted (by an admin?): %s", pvp_req)
 
-            direct_message = responses['deleted_poll'] + "[" +  title +"]"
+            link = ("[" + title + "](https://t.me/c/" + str(pvp_req[1])[2:] + "/" + ")")
+            direct_message = (jsonresponse[language]['deleted_poll'] + "\n" + link)
+
             try:
-                context.bot.send_message(chat_id=userid, text=direct_message)
+                context.bot.send_message(parse_mode = 'Markdown', chat_id=userid, text=direct_message)
             except:
                 logger.info("Cannot initiate private conversation with %s", arguments)
-
-"""
-This function is created to allow the maintenance of the bot.  It will halt new requests
-and also delete all active polls
-"""
-def maintenance(update, context):
-    global maintMode
-    active_chats = []
-    active_polls = []
-
-    # Load the language settings for this group
-    language = database.get_language(update.message.chat_id)
-    responses = jsonresponse[language]
-
-    # Try to delete the /pvp command
-    try:
-        context.bot.delete_message(chat_id=update.message.chat_id,
-                                   message_id=update._effective_message['message_id'])
-    # If we cannot delete the command, the bot probably doesn't have admin rights
-    except:
-        context.bot.send_message(chat_id=update.message.chat_id, text=responses['pvp_cant_delete'])
-        logger.info('Cannot delete message Chat:%s MessageID:%s', update.message.chat_id,
-                    update._effective_message['message_id'])
-
-    if is_admin(update.effective_user, update.effective_chat.get_administrators()):
-        maintMode = True
-    else:
-        return
-
-    # Gather all the chat groups with active polls
-    for polls in pvprequests:
-        if polls[1] not in active_chats:
-            active_chats.append(polls[1])
-
-        active_polls.append(polls)
-
-    for item in active_chats:
-        context.bot.send_message(chat_id=item, text=responses['maint'])
-
-    for polls in active_polls:
-        try:
-            context.bot.delete_message(chat_id=polls[1], message_id=polls[0])
-        except:
-            logger.info('Cannot delete message Chat:%s MessageID:%s', polls[1], polls[0])
-
-    pvprequests.clear()
-    competitors.clear()
 
