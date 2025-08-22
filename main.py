@@ -5,6 +5,7 @@ logger = logging.getLogger('Info')
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackQueryHandler, ChatJoinRequestHandler
 import json 
 import pvp_poll
+import admin_only
 import re
 import database
 import requests
@@ -130,9 +131,13 @@ def main():
     dispatcher.add_handler(CommandHandler("help", start))
 
     #Show Version
-    updater.dispatcher.add_handler(CommandHandler('version', pvp_poll.version))
+    updater.dispatcher.add_handler(CommandHandler('adminhelp', admin_only.admin_help))
+    #Admin routine to float all polls to the bottom
+    updater.dispatcher.add_handler(CommandHandler('version', admin_only.version))
     #Create a maintenance request
-    updater.dispatcher.add_handler(CommandHandler('maint', pvp_poll.maintenance))
+    updater.dispatcher.add_handler(CommandHandler('maint', admin_only.maintenance))
+    #Admin routine to float all polls to the bottom
+    updater.dispatcher.add_handler(CommandHandler('floatall', admin_only.floatall))
     #Create a pvp request
     updater.dispatcher.add_handler(CommandHandler('pvp', pvp_poll.pvp))
     #Add/removes a competitor if he clicks on fight
