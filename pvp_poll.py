@@ -92,6 +92,7 @@ def add_competitor(update, context):
     query = update.callback_query
     #Get the current language 
     language = database.get_language(update._effective_chat.id)
+    responses = jsonresponse[language]
 
     # Retrieve the user object and his name, if he has one defined
     user = update.effective_user
@@ -99,10 +100,19 @@ def add_competitor(update, context):
     balloons = ""
 
     # Format the users name
+    #if name is not None:
+    #    direct_message = "[" + name + "](tg://user?id=" + str(user.id) + ")"
+    #else:
+    #    direct_message = '@' + user.username
+
+    # TESTING ONLY FOR NOW
     if name is not None:
-        direct_message = "[" + name + "](tg://user?id=" + str(user.id) + ")"
+        direct_message = "[" + name + "]"
     else:
-        direct_message = '@' + user.username
+        direct_message = "[" + user.username + "]"
+
+    direct_message += "(tg://user?id=" + str(user.id) + ")"
+
 
     #remove user from competitor list
     if update.effective_user in competitors[query.message.message_id, update._effective_chat.id]:
@@ -114,15 +124,16 @@ def add_competitor(update, context):
         logger.info('%s joins from the PvP request from %s', update.effective_user.username, pvprequests[update.effective_message.message_id, update.effective_chat.id]['text'].split()[0])
         competitors[query.message.message_id, update._effective_chat.id].append(update.effective_user)
 
-        link = "[" + update.effective_chat.title + "](https://t.me/c/" + str(update.effective_chat.id)[2:] + "/" + ")"
-        direct_message += (jsonresponse[language]['accepted'] + "\n" + link)
+        link = "[" + update.effective_chat.title + "](https://t.me/c/" + str(update.effective_chat.id)[2:] + "/" + str(query.message.message_id) +  "/" + ")"
+        direct_message += (jsonresponse[language]['accepted'] + "\n" + link) + "   (UserID: " + str(user.id) + ")"
 
         #Try to send a private notification to the creator of the poll
         try:
-            context.bot.send_message(parse_mode='Markdown', chat_id=pvprequests[update.effective_message.message_id, update.effective_chat.id]['user'], text=direct_message)
+            context.bot.send_message(parse_mode='Markdown', chat_id=pvprequests[update.effective_message.message_id, update.effective_chat.id]['user'],
+                                     text=direct_message, reply_markup=pvp_response(responses))
             logger.info("Sent a private notification to %s", pvprequests[update.effective_message.message_id, update.effective_chat.id]['text'].split()[0])
         #If the creator doesn't have a private chat with the bot we cannot send him a private notification
-        except:
+        except Exception as e:
             logger.info("Cannot initiate private conversation with %s", pvprequests[update.effective_message.message_id, update.effective_chat.id]['text'].split()[0])
     
     """ Edit the pvp request and add the competitor"""
@@ -169,16 +180,14 @@ def remove_competitor(update, context):
         logger.info('%s revokes the PvP request from %s', update.effective_user.username,
                     pvprequests[update.effective_message.message_id, update.effective_chat.id]['text'].split()[0])
 
-        link = "[" + update.effective_chat.title + "](https://t.me/c/" + str(update.effective_chat.id)[2:] + "/" + ")"
+        link = "[" + update.effective_chat.title + "](https://t.me/c/" + str(update.effective_chat.id)[2:] + "/" + str(query.message.message_id) +  "/" + ")"
         direct_message += (jsonresponse[language]['removed'] + "\n" + link)
 
         competitors[query.message.message_id, update._effective_chat.id].remove(update.effective_user)
 
         try:
             context.bot.send_message(parse_mode='Markdown',
-                                    chat_id=pvprequests[update.effective_message.message_id, update.effective_chat.id][
-                                      'user'],
-                                     text=direct_message)
+                                    chat_id=pvprequests[update.effective_message.message_id, update.effective_chat.id]['user'], text=direct_message)
         except:
             logger.info("Cannot initiate private conversation with %s", pvprequests[update.effective_message.message_id, update.effective_chat.id]['text'].split()[0])
     else:
@@ -240,6 +249,15 @@ def pvp_keyboard(response):
     keyboard = [[InlineKeyboardButton(response['fight'], callback_data='fight'),
                 InlineKeyboardButton(response['leave'], callback_data='leave')],
                 [InlineKeyboardButton(response['delete'], callback_data='delete')]]
+    return InlineKeyboardMarkup(keyboard)
+
+"""
+Just the button markup for Sending and Thank You
+"""
+def pvp_response(response):
+    keyboard = [[InlineKeyboardButton(response['sending'], callback_data='sending'),
+                InlineKeyboardButton(response['thanks'], callback_data='thanks')]]
+
     return InlineKeyboardMarkup(keyboard)
 
 """
@@ -344,7 +362,7 @@ def auto_delete(context):
             except:
                 logger.info("PvP request was already deleted (by an admin?): %s", pvp_req)
 
-            link = ("[" + title + "](https://t.me/c/" + str(pvp_req[1])[2:] + "/" + ")")
+            link = ("[" + title + "](https://t.me/c/" + str(pvp_req[1])[2:] + "/" + str(pvp_req[0]) + "/" + ")")
             direct_message = (jsonresponse[language]['deleted_poll'] + "\n" + link)
 
             try:
@@ -352,3 +370,68 @@ def auto_delete(context):
             except:
                 logger.info("Cannot initiate private conversation with %s", arguments)
 
+
+"""
+This routine is executed when pollster clicks Sending in accepted battles
+It Sends a message to the battler the battle is about to be sent
+"""
+def sending(update, context):
+    battle_responses(update,context, action='sendingnow')
+
+"""
+This routine is executed when pollster clicks Thanks in accepted battles
+It Sends a message to the battler thanking them for the battle
+"""
+def thanks(update, context):
+    battle_responses(update,context, action='thankyou')
+
+def battle_responses(update, context, action):
+    # Load the language settings for this group
+    language = database.get_language(update._effective_chat.id)
+    responses = jsonresponse[language]
+
+    """
+    This section is all about getting the information from the
+    Sending Player - This is the player that tells challenger
+    I am now sending to you
+    """
+    # Retrieve the user object and his name, if he has one defined
+    user = update.effective_user
+    sender = trainernames.get_trainername(user.id)
+
+    # Format the users name
+    if sender is not None:
+        sending_player = "[" + sender + "]"
+    else:
+        sending_player = "[" + user.username + "]"
+
+    sending_player += "(tg://user?id=" + str(user.id) + ")"
+
+    # This is the only way to get access to the group chat the battle was sent from
+    xyz = update['callback_query']['message']['entities'][1]['url']
+    xyz = xyz.split('/')
+    groupid = '-1' + xyz[4]
+
+    """
+    This section is all about getting the information on the challenging
+    player. This is trickier because we do not get that info from the
+    effective user and dont have direct access to this info. It will
+    be retrieved from the message poll sent to senders Chat Bot
+    """
+    rcvr_id = update['callback_query']['message']['text']
+    rcvr_id = rcvr_id.split(": ")
+    rcvr_id = rcvr_id[1][:-1]
+
+    # Retrieve and Format the receivers name
+    receiver = trainernames.get_trainername(rcvr_id)
+
+    if receiver is not None:
+        receiving_player = "[" + receiver + "]"
+    else:
+        abc=context.bot.get_chat(rcvr_id)
+        receiving_player = "[" + abc['username'] + "]"
+
+    receiving_player += "(tg://user?id=" + str(rcvr_id) + ")"
+
+    response = "From: " + sending_player + ", " + responses[action] + receiving_player
+    context.bot.send_message(parse_mode='Markdown', chat_id=groupid, text=response)

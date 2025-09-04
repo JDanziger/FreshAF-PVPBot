@@ -19,7 +19,7 @@ jsonresponse = language_support.responses
 #Maintenance Mode
 maintMode = False
 #The current version of software
-ver ="1.6"
+ver ="1.8"
 
 """
 This method will discover who are the admins in the group
@@ -50,10 +50,6 @@ def version(update, context):
 
     if not is_admin(update.effective_user, update.effective_chat.get_administrators()):
         return
-
-    # Load the language settings for this group
-    language = database.get_language(update.message.chat_id)
-    responses = jsonresponse[language]
 
     response = responses['version'] + ver
     context.bot.send_message(chat_id=update.message.chat_id, text=response)

@@ -146,6 +146,10 @@ def main():
     updater.dispatcher.add_handler(CallbackQueryHandler(pvp_poll.remove_competitor, pattern='leave'))
     #Deletes a pvp request - TODO: Admins should be able to delete requests
     updater.dispatcher.add_handler(CallbackQueryHandler(pvp_poll.delete_poll, pattern='delete'))
+    # Notify battler that you will be sending.
+    updater.dispatcher.add_handler(CallbackQueryHandler(pvp_poll.sending, pattern='sending'))
+    # Send thanks to the battler
+    updater.dispatcher.add_handler(CallbackQueryHandler(pvp_poll.thanks, pattern='thanks'))
     #Check if there are any outdated pvp requests which we want to delete
     auto_del = job.run_repeating(pvp_poll.auto_delete, interval=300, first=0)
     float_poll = job.run_repeating(pvp_poll.float_poll, interval=120, first=0)
